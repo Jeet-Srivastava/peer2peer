@@ -32,7 +32,25 @@ const createProduct = async (req, res) => {
     }
 };
 
+// Fetching single product
+const getProductById = async (req, res) => {
+    try {
+        // req.params.id extracts the ID from the URL
+        const product = await Product.findById(req.params.id).populate('user', 'name email');
+
+        if (product) {
+            res.json(product);
+        } else {
+            res.status(404).json({ message: 'Product not found' });
+        }
+    } catch (error) {
+        // This catches errors like an invalid MongoDB ID format
+        res.status(500).json({ message: 'Server Error: Invalid product ID', error: error.message });
+    }
+};
+
 module.exports = {
     getProducts,
-    createProduct
+    createProduct,
+    getProductById
 };
