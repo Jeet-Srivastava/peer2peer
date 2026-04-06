@@ -1,16 +1,16 @@
 const Product = require('../models/Product');
 
-//fetch all products
+// Fetch all products
 const getProducts = async (req, res) => {
     try {
-        const products = await Product.find({});
+        const products = await Product.find({}).populate('user', 'name email').sort({ createdAt: -1 });
         res.json(products);
     } catch (error) {
         res.status(500).json({ message: 'Server Error: Could not fetch products' });
     }
 };
 
-//create new product
+// Create a new product listing
 const createProduct = async (req, res) => {
     try {
         const { name, description, price, category, condition, image } = req.body;
@@ -22,7 +22,7 @@ const createProduct = async (req, res) => {
             image,
             category,
             condition,
-            description
+            description,
         });
 
         const createdProduct = await product.save();
@@ -32,10 +32,9 @@ const createProduct = async (req, res) => {
     }
 };
 
-// Fetching single product
+// Fetch a single product by ID
 const getProductById = async (req, res) => {
     try {
-        // req.params.id extracts the ID from the URL
         const product = await Product.findById(req.params.id).populate('user', 'name email');
 
         if (product) {
@@ -44,13 +43,34 @@ const getProductById = async (req, res) => {
             res.status(404).json({ message: 'Product not found' });
         }
     } catch (error) {
-        // This catches errors like an invalid MongoDB ID format
         res.status(500).json({ message: 'Server Error: Invalid product ID', error: error.message });
+    }
+};
+
+// Delete a product (owner only)
+const deleteProduct = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        // Check if the logged-in user is the owner
+        if (product.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized to delete this product' });
+        }
+
+        await Product.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Product removed successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error: Could not delete product', error: error.message });
     }
 };
 
 module.exports = {
     getProducts,
     createProduct,
-    getProductById
+    getProductById,
+    deleteProduct,
 };
