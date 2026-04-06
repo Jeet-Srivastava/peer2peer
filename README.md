@@ -64,3 +64,11 @@ College students often buy items such as laptops, PCs, monitors, bicycles, table
 ## Conclusion
 
 peer2peer addresses a real student problem by providing a dedicated e-commerce system for buying and selling pre-owned items within a trusted college environment.
+
+---
+
+## Technical Documentation
+
+* [System Architecture](docs/ARCHITECTURE.md)
+* [Deployment Guide](docs/DEPLOYMENT.md)
+* [Design Decisions](docs/DECISIONS.md)
