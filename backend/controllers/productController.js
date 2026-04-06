@@ -3,7 +3,9 @@ const Product = require('../models/Product');
 // Fetch all products
 const getProducts = async (req, res) => {
     try {
-        const products = await Product.find({}).populate('user', 'name email').sort({ createdAt: -1 });
+        const products = await Product.find({})
+            .populate('user', 'name email')
+            .sort({ createdAt: -1 });
         res.json(products);
     } catch (error) {
         res.status(500).json({ message: 'Server Error: Could not fetch products' });
@@ -28,7 +30,10 @@ const createProduct = async (req, res) => {
         const createdProduct = await product.save();
         res.status(201).json(createdProduct);
     } catch (error) {
-        res.status(500).json({ message: 'Server Error: Could not create product', error: error.message });
+        res.status(500).json({
+            message: 'Server Error: Could not create product',
+            error: error.message,
+        });
     }
 };
 
@@ -64,7 +69,10 @@ const deleteProduct = async (req, res) => {
         await Product.findByIdAndDelete(req.params.id);
         res.json({ message: 'Product removed successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Server Error: Could not delete product', error: error.message });
+        res.status(500).json({
+            message: 'Server Error: Could not delete product',
+            error: error.message,
+        });
     }
 };
 

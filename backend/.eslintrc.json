@@ -1,0 +1,22 @@
+{
+    "env": {
+        "node": true,
+        "commonjs": true,
+        "es2021": true,
+        "jest": true
+    },
+    "extends": ["eslint:recommended", "prettier"],
+    "plugins": ["jest"],
+    "parserOptions": {
+        "ecmaVersion": "latest"
+    },
+    "rules": {
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^_|next" }],
+        "no-console": "off",
+        "prefer-const": "error",
+        "no-var": "error",
+        "eqeqeq": ["error", "always"],
+        "curly": ["error", "all"],
+        "no-throw-literal": "error"
+    }
+}

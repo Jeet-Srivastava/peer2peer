@@ -11,7 +11,7 @@ const storage = multer.diskStorage({
     filename(req, file, cb) {
         //Created a unique filename: fieldname-timestamp.extension
         cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-    }
+    },
 });
 
 //Configured the file filter to ONLY accept images
@@ -32,7 +32,7 @@ const upload = multer({
     storage,
     fileFilter: function (req, file, cb) {
         checkFileType(file, cb);
-    }
+    },
 });
 
 //Create the POST route to handle the upload
