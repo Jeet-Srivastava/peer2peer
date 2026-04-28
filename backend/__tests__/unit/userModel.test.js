@@ -32,7 +32,7 @@ describe('User Model', () => {
         expect(user._id).toBeDefined();
         expect(user.name).toBe(validUserData.name);
         expect(user.email).toBe(validUserData.email);
-        expect(user.role).toBe('student'); // default role
+        expect(user.role).toBe('buyer'); // default role
         expect(user.isVerified).toBe(false); // default
     });
 
@@ -113,9 +113,9 @@ describe('User Model', () => {
         expect(error.code).toBe(11000); // MongoDB duplicate key error
     });
 
-    it('should default role to student', async () => {
+    it('should default role to buyer', async () => {
         const user = await User.create(validUserData);
-        expect(user.role).toBe('student');
+        expect(user.role).toBe('buyer');
     });
 
     it('should allow admin role', async () => {

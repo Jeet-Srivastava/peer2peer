@@ -18,7 +18,19 @@ describe('Auth API Integration Tests', () => {
             expect(res.body).toHaveProperty('token');
             expect(res.body.name).toBe('Jeet Srivastava');
             expect(res.body.email).toBe('jeet@college.edu');
-            expect(res.body.role).toBe('student');
+            expect(res.body.role).toBe('buyer');
+        });
+
+        it('should allow seller registration when explicitly requested', async () => {
+            const res = await request(app).post('/api/auth/register').send({
+                name: 'Campus Seller',
+                email: 'seller@college.edu',
+                password: 'securePassword123',
+                role: 'seller',
+            });
+
+            expect(res.statusCode).toBe(201);
+            expect(res.body.role).toBe('seller');
         });
 
         it('should not register a user with an existing email', async () => {

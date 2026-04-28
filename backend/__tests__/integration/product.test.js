@@ -9,11 +9,12 @@ describe('Product API Integration Tests', () => {
     let userId;
 
     // Register and login a user before tests that need auth
-    const registerAndLogin = async () => {
+    const registerAndLogin = async (role = 'seller') => {
         const res = await request(app).post('/api/auth/register').send({
             name: 'Product Tester',
             email: `tester${Date.now()}@college.edu`,
             password: 'testpassword',
+            role,
         });
         return { token: res.body.token, userId: res.body._id };
     };
@@ -28,7 +29,7 @@ describe('Product API Integration Tests', () => {
         });
 
         it('should return all products', async () => {
-            const auth = await registerAndLogin();
+            const auth = await registerAndLogin('seller');
 
             // Create two products
             await request(app)
@@ -64,7 +65,7 @@ describe('Product API Integration Tests', () => {
 
     describe('POST /api/products', () => {
         beforeEach(async () => {
-            const auth = await registerAndLogin();
+            const auth = await registerAndLogin('seller');
             token = auth.token;
             userId = auth.userId;
         });
@@ -118,7 +119,7 @@ describe('Product API Integration Tests', () => {
 
     describe('GET /api/products/:id', () => {
         it('should return a single product by ID', async () => {
-            const auth = await registerAndLogin();
+            const auth = await registerAndLogin('seller');
 
             // Create a product
             const createRes = await request(app)
@@ -153,7 +154,7 @@ describe('Product API Integration Tests', () => {
 
     describe('DELETE /api/products/:id', () => {
         it('should delete a product when requested by the owner', async () => {
-            const auth = await registerAndLogin();
+            const auth = await registerAndLogin('seller');
 
             // Create a product
             const createRes = await request(app)
@@ -183,8 +184,8 @@ describe('Product API Integration Tests', () => {
         });
 
         it('should reject deletion by non-owner', async () => {
-            const owner = await registerAndLogin();
-            const otherUser = await registerAndLogin();
+            const owner = await registerAndLogin('seller');
+            const otherUser = await registerAndLogin('seller');
 
             // Owner creates product
             const createRes = await request(app)
@@ -211,7 +212,7 @@ describe('Product API Integration Tests', () => {
         });
 
         it('should reject deletion without auth', async () => {
-            const auth = await registerAndLogin();
+            const auth = await registerAndLogin('seller');
 
             const createRes = await request(app)
                 .post('/api/products')
