@@ -1,0 +1,279 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECS_CLUSTER: peer2peer-cluster
+  EXECUTION_ROLE_NAME: LabRole
+  SSM_PREFIX: /peer2peer
+  BACKEND_TASK_FAMILY: peer2peer-backend-task
+  FRONTEND_TASK_FAMILY: peer2peer-frontend-task
+  BACKEND_CONTAINER_NAME: peer2peer-backend
+  FRONTEND_CONTAINER_NAME: peer2peer-frontend
+  BACKEND_PORT: "8000"
+  FRONTEND_PORT: "80"
+  BACKEND_LOG_GROUP: /ecs/peer2peer-backend
+  FRONTEND_LOG_GROUP: /ecs/peer2peer-frontend
+  ALB_NAME: peer2peer-alb
+  ECS_SERVICE_SECURITY_GROUP_NAME: peer2peer-ecs-service-sg
+
+jobs:
+  ci:
+    name: CI - Lint, Test, Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run backend lint
+        working-directory: ./backend
+        run: npm run lint
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm test
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run frontend lint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+  deploy:
+    name: Deploy services to ECS
+    runs-on: ubuntu-latest
+    needs: ci
+    if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service_key: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            docker_build_args: ""
+            ecr_repository: peer2peer-backend
+            task_definition_template: ecs/backend-task-definition.json.template
+            container_name: peer2peer-backend
+            ecs_service: peer2peer-backend-service
+            target_group_name: peer2peer-backend-tg
+            container_port: 8000
+            desired_count: 1
+            health_check_grace_period_seconds: 60
+          - service_key: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+            docker_build_args: "--build-arg VITE_API_URL=/api"
+            ecr_repository: peer2peer-frontend
+            task_definition_template: ecs/frontend-task-definition.json.template
+            container_name: peer2peer-frontend
+            ecs_service: peer2peer-frontend-service
+            target_group_name: peer2peer-frontend-tg
+            container_port: 80
+            desired_count: 1
+            health_check_grace_period_seconds: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with GitHub OIDC
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Configure AWS credentials with temporary access keys
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' && secrets.AWS_SESSION_TOKEN != '' }}
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Configure AWS credentials with long-lived access keys
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' && secrets.AWS_SESSION_TOKEN == '' }}
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Resolve AWS account id
+        id: aws-account
+        run: |
+          echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          DOCKER_BUILD_ARGS: ${{ matrix.docker_build_args }}
+        run: |
+          docker build \
+            -f "${{ matrix.dockerfile }}" \
+            ${DOCKER_BUILD_ARGS} \
+            -t "${ECR_REGISTRY}/${{ matrix.ecr_repository }}:${IMAGE_TAG}" \
+            -t "${ECR_REGISTRY}/${{ matrix.ecr_repository }}:latest" \
+            "${{ matrix.context }}"
+
+          docker push "${ECR_REGISTRY}/${{ matrix.ecr_repository }}:${IMAGE_TAG}"
+          docker push "${ECR_REGISTRY}/${{ matrix.ecr_repository }}:latest"
+
+          echo "image=${ECR_REGISTRY}/${{ matrix.ecr_repository }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Render task definition template
+        id: render-template
+        env:
+          AWS_ACCOUNT_ID: ${{ steps.aws-account.outputs.account_id }}
+          EXECUTION_ROLE_ARN: arn:aws:iam::${{ steps.aws-account.outputs.account_id }}:role/${{ env.EXECUTION_ROLE_NAME }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          SSM_PREFIX: ${{ env.SSM_PREFIX }}
+          BACKEND_TASK_FAMILY: ${{ env.BACKEND_TASK_FAMILY }}
+          FRONTEND_TASK_FAMILY: ${{ env.FRONTEND_TASK_FAMILY }}
+          BACKEND_CONTAINER_NAME: ${{ env.BACKEND_CONTAINER_NAME }}
+          FRONTEND_CONTAINER_NAME: ${{ env.FRONTEND_CONTAINER_NAME }}
+          BACKEND_PORT: ${{ env.BACKEND_PORT }}
+          FRONTEND_PORT: ${{ env.FRONTEND_PORT }}
+          BACKEND_LOG_GROUP: ${{ env.BACKEND_LOG_GROUP }}
+          FRONTEND_LOG_GROUP: ${{ env.FRONTEND_LOG_GROUP }}
+        run: |
+          OUTPUT_FILE="$RUNNER_TEMP/${{ matrix.service_key }}-task-definition.json"
+          scripts/render-task-definition-template.sh "${{ matrix.task_definition_template }}" "${OUTPUT_FILE}"
+          echo "task_definition=${OUTPUT_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Inject image into task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-template.outputs.task_definition }}
+          container-name: ${{ matrix.container_name }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Discover ALB network resources
+        id: network
+        run: |
+          VPC_ID="$(aws elbv2 describe-load-balancers --names "${ALB_NAME}" --query 'LoadBalancers[0].VpcId' --output text)"
+          SUBNETS_CSV="$(aws elbv2 describe-load-balancers --names "${ALB_NAME}" --query 'LoadBalancers[0].AvailabilityZones[].SubnetId' --output text | tr '\t' ',')"
+          SERVICE_SG_ID="$(aws ec2 describe-security-groups \
+            --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${ECS_SERVICE_SECURITY_GROUP_NAME}" \
+            --query 'SecurityGroups[0].GroupId' \
+            --output text)"
+          TARGET_GROUP_ARN="$(aws elbv2 describe-target-groups --names "${{ matrix.target_group_name }}" --query 'TargetGroups[0].TargetGroupArn' --output text)"
+
+          if [ -z "${VPC_ID}" ] || [ "${VPC_ID}" = "None" ]; then
+            echo "Could not resolve VPC from ALB '${ALB_NAME}'." >&2
+            exit 1
+          fi
+
+          if [ -z "${SUBNETS_CSV}" ] || [ "${SUBNETS_CSV}" = "None" ]; then
+            echo "Could not resolve subnets from ALB '${ALB_NAME}'." >&2
+            exit 1
+          fi
+
+          if [ -z "${SERVICE_SG_ID}" ] || [ "${SERVICE_SG_ID}" = "None" ]; then
+            echo "Could not resolve ECS service security group '${ECS_SERVICE_SECURITY_GROUP_NAME}'." >&2
+            exit 1
+          fi
+
+          if [ -z "${TARGET_GROUP_ARN}" ] || [ "${TARGET_GROUP_ARN}" = "None" ]; then
+            echo "Could not resolve target group '${{ matrix.target_group_name }}'." >&2
+            exit 1
+          fi
+
+          echo "subnets_csv=${SUBNETS_CSV}" >> "$GITHUB_OUTPUT"
+          echo "service_sg_id=${SERVICE_SG_ID}" >> "$GITHUB_OUTPUT"
+          echo "target_group_arn=${TARGET_GROUP_ARN}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether ECS service already exists
+        id: service
+        run: |
+          SERVICE_STATUS="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${{ matrix.ecs_service }}" \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || true)"
+
+          if [ "${SERVICE_STATUS}" = "ACTIVE" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy updated task definition to existing ECS service
+        if: ${{ steps.service.outputs.exists == 'true' }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ matrix.ecs_service }}
+          wait-for-service-stability: true
+          wait-max-delay-seconds: 15
+          enable-ecs-managed-tags: true
+
+      - name: Create ECS service on first deployment
+        if: ${{ steps.service.outputs.exists == 'false' }}
+        env:
+          TASK_DEFINITION_FILE: ${{ steps.task-def.outputs.task-definition }}
+          SUBNETS_CSV: ${{ steps.network.outputs.subnets_csv }}
+          SERVICE_SG_ID: ${{ steps.network.outputs.service_sg_id }}
+          TARGET_GROUP_ARN: ${{ steps.network.outputs.target_group_arn }}
+        run: |
+          TASK_DEFINITION_ARN="$(aws ecs register-task-definition \
+            --cli-input-json "file://${TASK_DEFINITION_FILE}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          aws ecs create-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service-name "${{ matrix.ecs_service }}" \
+            --task-definition "${TASK_DEFINITION_ARN}" \
+            --desired-count "${{ matrix.desired_count }}" \
+            --launch-type FARGATE \
+            --platform-version LATEST \
+            --health-check-grace-period-seconds "${{ matrix.health_check_grace_period_seconds }}" \
+            --load-balancers "targetGroupArn=${TARGET_GROUP_ARN},containerName=${{ matrix.container_name }},containerPort=${{ matrix.container_port }}" \
+            --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_CSV}],securityGroups=[${SERVICE_SG_ID}],assignPublicIp=ENABLED}"
+
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${{ matrix.ecs_service }}"

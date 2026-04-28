@@ -1,25 +1,14 @@
-name: Deploy to AWS EC2
+name: Legacy EC2 Deploy
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  deploy:
+  deprecated:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          cd /path/to/your/project/on/ec2/peer2peer
-          git pull origin main
-          bash scripts/deploy.sh
+      - name: Repository now deploys with ECS
+        run: |
+          echo "The EC2 deployment workflow has been retired."
+          echo "Use .github/workflows/aws-ecs-deploy.yml for ECR + ECS Fargate deployments."

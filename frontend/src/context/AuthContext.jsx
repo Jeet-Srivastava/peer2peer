@@ -1,31 +1,24 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useState } from 'react';
+import { AuthContext } from './authContext';
 
-const AuthContext = createContext(null);
+const getSavedUser = () => {
+    const savedUser = localStorage.getItem('user');
 
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within AuthProvider');
+    if (!savedUser) {
+        return null;
     }
-    return context;
+
+    try {
+        return JSON.parse(savedUser);
+    } catch {
+        localStorage.removeItem('user');
+        return null;
+    }
 };
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Load user from localStorage on mount
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch {
-                localStorage.removeItem('user');
-            }
-        }
-        setLoading(false);
-    }, []);
+    const [user, setUser] = useState(getSavedUser);
+    const loading = false;
 
     const login = (userData) => {
         setUser(userData);

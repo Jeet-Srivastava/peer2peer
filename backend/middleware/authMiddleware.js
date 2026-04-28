@@ -28,4 +28,12 @@ const protect = async (req, res, next) => {
     }
 };
 
-module.exports = { protect };
+const sellerOnly = (req, res, next) => {
+    if (req.user && req.user.role === 'seller') {
+        next();
+    } else {
+        res.status(403).json({ message: 'Not authorized as a seller' });
+    }
+};
+
+module.exports = { protect, sellerOnly };

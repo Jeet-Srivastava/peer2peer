@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { registerUser } from '../services/api';
 
 function Register() {
@@ -8,6 +8,7 @@ function Register() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [role, setRole] = useState('buyer'); // Default to buyer
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
@@ -30,7 +31,7 @@ function Register() {
         setLoading(true);
 
         try {
-            const { data } = await registerUser({ name, email, password });
+            const { data } = await registerUser({ name, email, password, role });
             login(data);
             navigate('/');
         } catch (err) {
@@ -43,10 +44,27 @@ function Register() {
     return (
         <div className="auth-page">
             <div className="auth-card">
-                <h1 className="auth-title" id="register-title">Create account</h1>
-                <p className="auth-subtitle">Join the campus marketplace</p>
+                <h1 className="auth-title" id="register-title">Getting Started</h1>
+                <p className="auth-subtitle">Join the modern campus marketplace</p>
 
                 {error && <div className="alert alert-error" id="register-error">{error}</div>}
+
+                <div className="role-selector">
+                    <button 
+                        className={`role-btn ${role === 'buyer' ? 'active' : ''}`}
+                        onClick={() => setRole('buyer')}
+                        type="button"
+                    >
+                        I want to Buy
+                    </button>
+                    <button 
+                        className={`role-btn ${role === 'seller' ? 'active' : ''}`}
+                        onClick={() => setRole('seller')}
+                        type="button"
+                    >
+                        I want to Sell
+                    </button>
+                </div>
 
                 <form onSubmit={handleSubmit} id="register-form">
                     <div className="form-group">
@@ -108,7 +126,7 @@ function Register() {
                         disabled={loading}
                         id="register-submit"
                     >
-                        {loading ? 'Creating account...' : 'Create Account'}
+                        {loading ? 'Creating account...' : `Create ${role === 'seller' ? 'Seller' : 'Buyer'} Account`}
                     </button>
                 </form>
 

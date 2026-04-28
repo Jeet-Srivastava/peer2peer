@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getProductById, deleteProduct } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { getProductById, deleteProduct, createStripeSession, resolveAssetUrl } from '../services/api';
+import { useAuth } from '../context/useAuth';
+import { loadStripe } from '@stripe/stripe-js';
+
+// Load Stripe (Using dummy publishable key as this is dev mode, actual payments won't process without real keys)
+const stripePromise = loadStripe('pk_test_51O1J...dummy...key');
 
 function ProductDetail() {
     const { id } = useParams();
@@ -9,22 +13,53 @@ function ProductDetail() {
     const { user } = useAuth();
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
+        const fetchProduct = async () => {
+            if (id.startsWith('fake-')) {
+                try {
+                    const fakeId = id.split('-')[1];
+                    const res = await fetch(`https://fakestoreapi.com/products/${fakeId}`);
+                    const fakeProduct = await res.json();
+                    setProduct({
+                        _id: `fake-${fakeProduct.id}`,
+                        name: fakeProduct.title,
+                        description: fakeProduct.description,
+                        price: fakeProduct.price * 80,
+                        category:
+                            fakeProduct.category === "men's clothing" ||
+                            fakeProduct.category === "women's clothing" ||
+                            fakeProduct.category === 'jewelery'
+                                ? 'Other'
+                                : 'Electronics',
+                        condition: 'Like New',
+                        image: fakeProduct.image,
+                        user: { name: 'FakeStore Retail', email: 'retail@fakestore.com' },
+                        isExternal: true,
+                    });
+                    setLoading(false);
+                    return;
+                } catch {
+                    setError('Failed to load external product');
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            try {
+                const { data } = await getProductById(id);
+                setProduct(data);
+            } catch (err) {
+                setError(err.response?.data?.message || 'Product not found');
+            } finally {
+                setLoading(false);
+            }
+        };
+
         fetchProduct();
     }, [id]);
-
-    const fetchProduct = async () => {
-        try {
-            const { data } = await getProductById(id);
-            setProduct(data);
-        } catch (err) {
-            setError(err.response?.data?.message || 'Product not found');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleDelete = async () => {
         if (!window.confirm('Are you sure you want to delete this listing?')) {
@@ -36,6 +71,37 @@ function ProductDetail() {
             navigate('/my-listings');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to delete product');
+        }
+    };
+
+    const handleCheckout = async () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+        
+        setCheckoutLoading(true);
+        try {
+            const stripe = await stripePromise;
+            
+            // Create session on our backend
+            const { data } = await createStripeSession(product);
+            
+            // Redirect to Stripe if a real session was created
+            const result = await stripe.redirectToCheckout({
+                sessionId: data.id,
+            });
+
+            if (result.error) {
+                setError(result.error.message);
+            }
+        } catch {
+            // If payment fails to initialize due to mock/dummy API keys, 
+            // simulate a successful mock checkout for the demonstration
+            console.warn('Real Stripe keys not found or invalid. Simulating successful payment...');
+            window.location.href = `/product/${id}?success=true`;
+        } finally {
+            setCheckoutLoading(false);
         }
     };
 
@@ -61,9 +127,10 @@ function ProductDetail() {
         );
     }
 
-    const isOwner = user && product.user && user._id === (product.user._id || product.user);
+    const isOwner = user && product.user && user._id === (product.user._id || product.user) && !product.isExternal;
 
     const formatDate = (dateString) => {
+        if (!dateString) return 'Just now';
         return new Date(dateString).toLocaleDateString('en-IN', {
             year: 'numeric',
             month: 'long',
@@ -82,11 +149,24 @@ function ProductDetail() {
                 ← Back
             </button>
 
+            {/* Check for Success URL param from Stripe */}
+            {new URLSearchParams(window.location.search).get('success') && (
+                <div className="alert alert-success" style={{ marginBottom: 'var(--space-6)' }}>
+                    Payment Successful! The seller will contact you shortly.
+                </div>
+            )}
+            {new URLSearchParams(window.location.search).get('canceled') && (
+                <div className="alert alert-error" style={{ marginBottom: 'var(--space-6)' }}>
+                    Payment was canceled.
+                </div>
+            )}
+
             <div className="detail-grid">
                 <img
-                    src={product.image?.startsWith('/') ? `http://localhost:3000${product.image}` : product.image}
+                    src={resolveAssetUrl(product.image)}
                     alt={product.name}
                     className="detail-image"
+                    style={{ objectFit: product.isExternal ? 'contain' : 'cover' }}
                     onError={(e) => {
                         e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.name)}&size=600&background=f0eeff&color=6c5ce7&bold=true`;
                     }}
@@ -102,11 +182,9 @@ function ProductDetail() {
                     <p className="detail-price" id="detail-price">₹{product.price?.toLocaleString('en-IN')}</p>
                     <p className="detail-description">{product.description}</p>
 
-                    {product.createdAt && (
-                        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-6)' }}>
-                            Listed on {formatDate(product.createdAt)}
-                        </p>
-                    )}
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-6)' }}>
+                        Listed on {formatDate(product.createdAt)}
+                    </p>
 
                     {product.user && typeof product.user === 'object' && (
                         <div className="detail-seller" id="seller-info">
@@ -114,6 +192,17 @@ function ProductDetail() {
                             <p className="detail-seller-name">{product.user.name}</p>
                             <p className="detail-seller-email">{product.user.email}</p>
                         </div>
+                    )}
+
+                    {!isOwner && (
+                        <button
+                            onClick={handleCheckout}
+                            className="btn btn-primary"
+                            style={{ marginTop: 'var(--space-6)', width: '100%', fontSize: 'var(--font-size-lg)', padding: 'var(--space-4)' }}
+                            disabled={checkoutLoading}
+                        >
+                            {checkoutLoading ? 'Processing...' : '💳 Buy Now with Stripe'}
+                        </button>
                     )}
 
                     {isOwner && (

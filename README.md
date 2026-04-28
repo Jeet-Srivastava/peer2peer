@@ -45,10 +45,50 @@ College students often buy items such as laptops, PCs, monitors, bicycles, table
 
 ## Tech Stack
 
-* **Frontend:** React.js, HTML, CSS, JavaScript
+* **Frontend:** React.js (Vite), HTML, CSS, JavaScript
 * **Backend:** Node.js, Express.js
-* **Database:** MongoDB
-* **Auth & Tools:** JWT, Cloud image storage, Git & GitHub
+* **Database:** MongoDB (Atlas)
+* **Auth:** JWT (JSON Web Tokens)
+* **Payments:** Stripe
+* **Containerization:** Docker (multi-stage builds)
+* **Container Registry:** Amazon ECR
+* **Deployment:** Amazon ECS (Fargate)
+* **Logging:** AWS CloudWatch
+* **Secrets Management:** AWS SSM Parameter Store
+* **CI/CD:** GitHub Actions
+* **Testing:** Jest, Supertest, Playwright
+
+---
+
+## Quick Start
+
+### Local Development (Without Docker)
+```bash
+# Setup environment files
+bash scripts/setup.sh
+
+# Start backend
+cd backend && npm install && npm run dev
+
+# Start frontend (in a new terminal)
+cd frontend && npm install && npm run dev
+```
+
+### Local Development (With Docker)
+```bash
+docker compose up --build
+# Backend: http://localhost:8000
+# Frontend: http://localhost:3000
+```
+
+### Deploy to AWS
+```bash
+# One-time infrastructure setup
+bash scripts/aws-infra-setup.sh
+
+# Then push to main — CI/CD handles the rest
+git push origin main
+```
 
 ---
 
@@ -56,14 +96,14 @@ College students often buy items such as laptops, PCs, monitors, bicycles, table
 
 * A functional student-focused e-commerce platform
 * Cost-effective reuse of products within campus
-* Practical experience with full-stack development
-* Clear demonstration of system design and role-based access control
+* Practical experience with full-stack development and cloud deployment
+* Clear demonstration of system design, containerization, and CI/CD pipelines
 
 ---
 
 ## Conclusion
 
-peer2peer addresses a real student problem by providing a dedicated e-commerce system for buying and selling pre-owned items within a trusted college environment.
+peer2peer addresses a real student problem by providing a dedicated e-commerce system for buying and selling pre-owned items within a trusted college environment. The project demonstrates modern DevOps practices including containerized deployments, automated CI/CD pipelines, and cloud-native infrastructure on AWS.
 
 ---
 

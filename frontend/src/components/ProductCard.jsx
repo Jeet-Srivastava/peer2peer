@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { resolveAssetUrl } from '../services/api';
 
 function ProductCard({ product }) {
     const conditionColors = {
@@ -11,7 +12,7 @@ function ProductCard({ product }) {
     return (
         <Link to={`/product/${product._id}`} className="card" id={`product-${product._id}`}>
             <img
-                src={product.image?.startsWith('/') ? `http://localhost:3000${product.image}` : product.image || '/placeholder.svg'}
+                src={resolveAssetUrl(product.image) || '/placeholder.svg'}
                 alt={product.name}
                 className="card-image"
                 onError={(e) => {

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { useState, useEffect } from 'react';
 
 function Navbar() {
@@ -21,7 +21,7 @@ function Navbar() {
         <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} id="main-navbar">
             <div className="navbar-inner">
                 <Link to="/" className="navbar-brand">
-                    <span className="brand-icon">P2</span>
+                    <span className="brand-icon">P2P</span>
                     peer2peer
                 </Link>
 
@@ -36,20 +36,24 @@ function Navbar() {
 
                     {user ? (
                         <>
-                            <Link
-                                to="/create"
-                                className={`nav-link ${isActive('/create') ? 'active' : ''}`}
-                                id="nav-create"
-                            >
-                                Sell Item
-                            </Link>
-                            <Link
-                                to="/my-listings"
-                                className={`nav-link ${isActive('/my-listings') ? 'active' : ''}`}
-                                id="nav-listings"
-                            >
-                                My Listings
-                            </Link>
+                            {user.role === 'seller' && (
+                                <>
+                                    <Link
+                                        to="/create"
+                                        className={`nav-link ${isActive('/create') ? 'active' : ''}`}
+                                        id="nav-create"
+                                    >
+                                        Sell Item
+                                    </Link>
+                                    <Link
+                                        to="/my-listings"
+                                        className={`nav-link ${isActive('/my-listings') ? 'active' : ''}`}
+                                        id="nav-listings"
+                                    >
+                                        My Listings
+                                    </Link>
+                                </>
+                            )}
                             <Link
                                 to="/profile"
                                 className={`nav-link ${isActive('/profile') ? 'active' : ''}`}

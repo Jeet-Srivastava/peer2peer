@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { getProducts, deleteProduct } from '../services/api';
 import ProductCard from '../components/ProductCard';
 
@@ -11,24 +11,23 @@ function MyListings() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchMyProducts();
-    }, []);
+        const fetchMyProducts = async () => {
+            try {
+                const { data } = await getProducts();
+                const myProducts = data.filter((product) => {
+                    const productUserId = product.user?._id || product.user;
+                    return productUserId === user?._id;
+                });
+                setProducts(myProducts);
+            } catch {
+                setError('Failed to load your listings');
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const fetchMyProducts = async () => {
-        try {
-            const { data } = await getProducts();
-            // Filter products that belong to the current user
-            const myProducts = data.filter((p) => {
-                const productUserId = p.user?._id || p.user;
-                return productUserId === user?._id;
-            });
-            setProducts(myProducts);
-        } catch (err) {
-            setError('Failed to load your listings');
-        } finally {
-            setLoading(false);
-        }
-    };
+        fetchMyProducts();
+    }, [user?._id]);
 
     const handleDelete = async (productId) => {
         if (!window.confirm('Are you sure you want to delete this listing?')) {
@@ -37,7 +36,9 @@ function MyListings() {
 
         try {
             await deleteProduct(productId);
-            setProducts(products.filter((p) => p._id !== productId));
+            setProducts((currentProducts) =>
+                currentProducts.filter((product) => product._id !== productId)
+            );
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to delete product');
         }

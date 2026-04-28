@@ -4,7 +4,7 @@ const generateToken = require('../utils/generateToken');
 // Register a new student
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, role } = req.body;
 
         // Check if user already exists
         const userExists = await User.findOne({ email });
@@ -17,6 +17,7 @@ const registerUser = async (req, res) => {
             name,
             email,
             password,
+            role: role === 'seller' ? 'seller' : 'buyer', // Only allow buyer or seller
         });
 
         if (user) {

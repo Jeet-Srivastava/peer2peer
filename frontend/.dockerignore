@@ -1,0 +1,39 @@
+# =============================================================================
+# .dockerignore — Exclude files from the Docker build context
+# =============================================================================
+
+# Dependencies (installed fresh inside the container)
+node_modules
+
+# Build output (generated inside the container)
+dist
+
+# Environment files
+.env
+.env.*
+
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Tests
+tests
+playwright.config.js
+playwright-report
+
+# Dev tooling
+eslint.config.js
+.editorconfig
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Documentation
+README.md

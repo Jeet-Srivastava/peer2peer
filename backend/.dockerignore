@@ -1,0 +1,39 @@
+# =============================================================================
+# .dockerignore — Exclude files from the Docker build context
+# =============================================================================
+
+# Dependencies (will be installed fresh inside the container)
+node_modules
+
+# Environment files (secrets are injected via ECS Task Definition)
+.env
+.env.*
+
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Tests & dev tooling
+__tests__
+*.test.js
+*.spec.js
+.eslintrc.json
+.prettierrc
+.prettierignore
+.editorconfig
+coverage
+
+# Docker files (no need to copy themselves)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+docs

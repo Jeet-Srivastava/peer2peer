@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
+const ASSET_BASE_URL =
+    import.meta.env.VITE_ASSET_BASE_URL ||
+    (API_URL.startsWith('http') ? API_URL.replace(/\/api\/?$/, '') : '');
 
 const api = axios.create({
     baseURL: API_URL,
@@ -34,5 +37,16 @@ export const uploadImage = (formData) =>
     api.post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
     });
+
+// Payment API
+export const createStripeSession = (productData) => api.post('/payments/create-checkout-session', { product: productData });
+
+export const resolveAssetUrl = (assetPath) => {
+    if (!assetPath || !assetPath.startsWith('/')) {
+        return assetPath;
+    }
+
+    return ASSET_BASE_URL ? `${ASSET_BASE_URL}${assetPath}` : assetPath;
+};
 
 export default api;

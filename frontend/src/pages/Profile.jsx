@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { getProfile } from '../services/api';
 
 function Profile() {
@@ -9,20 +9,19 @@ function Profile() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchProfile();
-    }, []);
+        const fetchProfile = async () => {
+            try {
+                const { data } = await getProfile();
+                setProfile(data);
+            } catch {
+                setProfile(user);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const fetchProfile = async () => {
-        try {
-            const { data } = await getProfile();
-            setProfile(data);
-        } catch (err) {
-            // Fallback to stored user data
-            setProfile(user);
-        } finally {
-            setLoading(false);
-        }
-    };
+        fetchProfile();
+    }, [user]);
 
     if (loading) {
         return (

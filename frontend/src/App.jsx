@@ -9,6 +9,7 @@ import CreateListing from './pages/CreateListing';
 import Profile from './pages/Profile';
 import MyListings from './pages/MyListings';
 import ProtectedRoute from './components/ProtectedRoute';
+import SellerRoute from './components/SellerRoute';
 
 function App() {
     return (
@@ -23,9 +24,9 @@ function App() {
                     <Route
                         path="/create"
                         element={
-                            <ProtectedRoute>
+                            <SellerRoute>
                                 <CreateListing />
-                            </ProtectedRoute>
+                            </SellerRoute>
                         }
                     />
                     <Route
@@ -39,9 +40,9 @@ function App() {
                     <Route
                         path="/my-listings"
                         element={
-                            <ProtectedRoute>
+                            <SellerRoute>
                                 <MyListings />
-                            </ProtectedRoute>
+                            </SellerRoute>
                         }
                     />
                 </Routes>

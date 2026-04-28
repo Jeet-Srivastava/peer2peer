@@ -6,11 +6,11 @@ const {
     getProductById,
     deleteProduct,
 } = require('../controllers/productController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, sellerOnly } = require('../middleware/authMiddleware');
 
 router.get('/', getProducts);
 router.get('/:id', getProductById);
-router.post('/', protect, createProduct);
-router.delete('/:id', protect, deleteProduct);
+router.post('/', protect, sellerOnly, createProduct);
+router.delete('/:id', protect, sellerOnly, deleteProduct);
 
 module.exports = router;
